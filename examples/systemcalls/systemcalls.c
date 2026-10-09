@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <stdlib.h>     // system(), EXIT_FAILURE
+#include <sys/types.h>  // pid_t
+#include <sys/wait.h>   // waitpid(), WIFEXITED(), WEXITSTATUS()
+#include <unistd.h>     // fork(), execv(), dup2(), _exit()
+#include <fcntl.h>      // open(), O_WRONLY, O_CREAT, O_TRUNC
+#include <stdio.h>      // fflush(), perror()
 
 /**
  * @param cmd the command to execute with system()
@@ -10,14 +16,30 @@
 bool do_system(const char *cmd)
 {
 
+	int status;
+
+		// Execute the command using the shell
+		status = system(cmd);
+
+		// Check if system() failed
+		if (status == -1)
+		{
+			return false;
+		}
+
+		// Check if command exited normally with exit code 0
+		if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+		{
+			return true;
+		}
+
+		return false;
 /*
  * TODO  add your code here
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
 }
 
 /**
@@ -47,8 +69,48 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    ////command[count] = command[count];
+	    va_end(args);
 
+    int status;
+    pid_t pid;
+
+    // Flush stdout before creating the child process
+    fflush(stdout);
+
+    // Create a child process
+    pid = fork();
+
+    if (pid == -1)
+    {
+        perror("fork");
+        return false;
+    }
+
+    if (pid == 0)
+    {
+        // Child process: execute the requested program
+        execv(command[0], command);
+
+        // execv only returns when an error occurs
+        perror("execv");
+        _exit(EXIT_FAILURE);
+    }
+
+    // Parent process: wait for the child to finish
+    if (waitpid(pid, &status, 0) == -1)
+    {
+        perror("waitpid");
+        return false;
+    }
+
+    // Confirm that the child exited successfully
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+    {
+        return true;
+    }
+
+    return false;
 /*
  * TODO:
  *   Execute a system command by calling fork, execv(),
@@ -58,10 +120,6 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
-    va_end(args);
-
-    return true;
 }
 
 /**
@@ -82,8 +140,71 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    ////command[count] = command[count];
+	    va_end(args);
 
+    int status;
+    pid_t pid;
+
+    // Flush output before forking
+    fflush(stdout);
+
+    // Create a child process
+    pid = fork();
+
+    if (pid == -1)
+    {
+        perror("fork");
+        return false;
+    }
+
+    if (pid == 0)
+    {
+        // Child process: open output file
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+        if (fd == -1)
+        {
+            perror("open");
+            _exit(EXIT_FAILURE);
+        }
+
+        // Redirect standard output to the file
+        if (dup2(fd, STDOUT_FILENO) == -1)
+        {
+            perror("dup2");
+            close(fd);
+            _exit(EXIT_FAILURE);
+        }
+
+        // Close the original descriptor if different from stdout
+        if (fd != STDOUT_FILENO)
+        {
+            close(fd);
+        }
+
+        // Execute the command with redirected output
+        execv(command[0], command);
+
+        // Only reached if execv fails
+        perror("execv");
+        _exit(EXIT_FAILURE);
+    }
+
+    // Parent waits for child process
+    if (waitpid(pid, &status, 0) == -1)
+    {
+        perror("waitpid");
+        return false;
+    }
+
+    // Check command exit status
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+    {
+        return true;
+    }
+
+    return false;
 
 /*
  * TODO
@@ -92,8 +213,4 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
-    va_end(args);
-
-    return true;
 }
