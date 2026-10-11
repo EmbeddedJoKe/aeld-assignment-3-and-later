@@ -1,12 +1,16 @@
-CC = $(CROSS_COMPILE)gcc # selects compiler
-CFLAGS = -Wall -Wextra # keeps compiler warnings enabled
+# Honor CC supplied by Buildroot or the caller. GNU make otherwise defaults
+# CC to cc; retain CROSS_COMPILE support for the earlier assignments.
+ifeq ($(origin CC),default)
+CC = $(CROSS_COMPILE)gcc
+endif
+CFLAGS ?= -Wall -Wextra
 
-all: writer # build the writer app by default
+all: writer
 
-writer: writer.c # writer depends on writer.c and runs executable
-	$(CC) $(CFLAGS) -o writer writer.c
+writer: writer.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
-clean: # removes executable and files ending in .o from current folder
+clean:
 	rm -f writer *.o
 
-.PHONY: all clean # prevents a file named clean from blocking cleanup
+.PHONY: all clean
