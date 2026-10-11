@@ -1,0 +1,44 @@
+#!/bin/sh
+# BusyBox-compatible SysV service. aesdsocket performs its own daemonization.
+DAEMON=/usr/bin/aesdsocket
+
+start() {
+    printf 'Starting aesdsocket: '
+    if [ ! -x "$DAEMON" ]; then
+        echo 'FAIL (executable missing)' >&2
+        return 1
+    fi
+    if start-stop-daemon -S -q -o -x "$DAEMON" -- -d; then
+        echo 'OK'
+    else
+        echo 'FAIL' >&2
+        return 1
+    fi
+}
+
+stop() {
+    printf 'Stopping aesdsocket: '
+    if ! start-stop-daemon -K -q -o -s TERM -x "$DAEMON"; then
+        echo 'FAIL (SIGTERM)' >&2
+        return 1
+    fi
+    # BusyBox ignores --retry. Wait explicitly so shutdown does not unmount
+    # the filesystem before the server removes its data file.
+    remaining=10
+    while pidof aesdsocket >/dev/null 2>&1; do
+        if [ "$remaining" -eq 0 ]; then
+            echo 'FAIL (shutdown timed out)' >&2
+            return 1
+        fi
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+    echo 'OK'
+}
+
+case "${1:-}" in
+    start) start ;;
+    stop) stop ;;
+    restart|reload) stop && start ;;
+    *) echo "Usage: $0 {start|stop|restart|reload}" >&2; exit 1 ;;
+esac

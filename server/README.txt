@@ -47,5 +47,7 @@ plus permission to create TCP sockets and write /var/tmp. The official
 Assignment 5 CI container provides these tools. CI runs the existing unit
 suite before full-test and queues later runs without cancelling active jobs.
 
-The service script and embedded integration belong to Part 2 and are pending
-the user's Part 1 review.
+The Part 2 aesdsocket-start-stop service uses BusyBox start-stop-daemon to
+start /usr/bin/aesdsocket -d and send SIGTERM on stop. It waits for the process
+to exit before shutdown continues; BusyBox does not implement --retry.
+Buildroot installs it as /etc/init.d/S99aesdsocket for boot and shutdown.
